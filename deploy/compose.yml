@@ -1,0 +1,32 @@
+# Deliberate migration runner (Anexo J: deploy/ holds only the runner). MongoDB and chat_app are owned
+# by market-agri-infra-mongo; this runner connects as the instance administrator and keeps its own
+# control collections (databasechangelog_chat). ENV (dev | qa | main) is also the Liquibase context:
+# the seed conversation (context dev,qa) is skipped in main.
+services:
+  chat-db-migrate:
+    build:
+      context: .
+      dockerfile: liquibase.Dockerfile
+    profiles: [tooling]
+    depends_on:
+      mongo:
+        condition: service_healthy
+    volumes:
+      - ../:/workspace:ro
+    environment:
+      # The URL carries the password: an environment variable, never an argument on the command line.
+      LIQUIBASE_COMMAND_URL: mongodb://${MONGO_ADMIN_USER:?set MONGO_ADMIN_USER}:${MONGO_ADMIN_PASSWORD:?set MONGO_ADMIN_PASSWORD}@mongo:27017/chat?authSource=admin&replicaSet=rs0
+    entrypoint:
+      - liquibase
+      - --search-path=/workspace
+      - --changelog-file=changelog/changelog-master.yaml
+      - --database-changelog-table-name=databasechangelog_chat
+      - --database-changelog-lock-table-name=databasechangeloglock_chat
+      - "--contexts=${ENV:?set ENV}"
+    command: [update]
+    networks: [platform]
+
+networks:
+  platform:
+    name: platform-${ENV:?set ENV}
+    external: true

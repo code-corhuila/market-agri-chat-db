@@ -1,0 +1,93 @@
+# Each collection is created WITH its $jsonSchema validator (Anexo B): strict level, error action and
+# additionalProperties false, so a typo in a field name is rejected instead of stored. Ids are domain
+# UUIDs as strings (06-data/models.md, service chat); ids of other domains are never references.
+# A single createCollection either succeeds or fails whole, so each changeset is idempotent by itself;
+# the rollback is declared inline (dropCollection). The extension reads options, keys, documents and
+# commands as JSON text (a YAML string), which it passes to MongoDB as they are. Notes on the fields:
+# agreedPurchaseMethod is null until a participant chooses (D-C15, E-34); requestId is the id of
+# message.send, so a resend stores nothing (contract §5.3); content is 1–2000 characters after
+# trimming (AGGR-INV-003, D-C34); envelope is the full event of contract §6, as the relay publishes it.
+databaseChangeLog:
+- changeSet:
+    id: 001-create-conversation
+    author: elkin
+    comment: One thread per (product, buyer) with the snapshots ConversationView shows (E-30, D-C31)
+    changes:
+    - createCollection:
+        collectionName: conversation
+        options: |
+          {
+            "validationLevel": "strict", "validationAction": "error",
+            "validator": { "$jsonSchema": {
+              "bsonType": "object", "additionalProperties": false,
+              "required": ["_id", "productId", "productName", "buyerId", "buyerName", "producerId", "producerName", "agreedPurchaseMethod", "lastMessageAt", "createdAt"],
+              "properties": {
+                "_id": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "productId": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "productName": {"bsonType": "string", "minLength": 1, "maxLength": 200},
+                "buyerId": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "buyerName": {"bsonType": "string", "minLength": 1, "maxLength": 200},
+                "producerId": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "producerName": {"bsonType": "string", "minLength": 1, "maxLength": 200},
+                "agreedPurchaseMethod": {"enum": ["PLATFORM", "OFF_PLATFORM", null]},
+                "lastMessageAt": {"bsonType": ["date", "null"]},
+                "createdAt": {"bsonType": "date"}
+              }
+            } }
+          }
+    rollback:
+    - dropCollection:
+        collectionName: conversation
+- changeSet:
+    id: 002-create-message
+    author: elkin
+    comment: One message; not embedded in the conversation because their number is unbounded
+    changes:
+    - createCollection:
+        collectionName: message
+        options: |
+          {
+            "validationLevel": "strict", "validationAction": "error",
+            "validator": { "$jsonSchema": {
+              "bsonType": "object", "additionalProperties": false,
+              "required": ["_id", "conversationId", "senderId", "requestId", "content", "sentAt"],
+              "properties": {
+                "_id": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "conversationId": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "senderId": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "requestId": {"bsonType": "string", "minLength": 1, "maxLength": 64},
+                "content": {"bsonType": "string", "minLength": 1, "maxLength": 2000},
+                "sentAt": {"bsonType": "date"}
+              }
+            } }
+          }
+    rollback:
+    - dropCollection:
+        collectionName: message
+- changeSet:
+    id: 003-create-outbox-event
+    author: elkin
+    comment: Events waiting for the relay, written in the same transaction as the message (ADR-014)
+    changes:
+    - createCollection:
+        collectionName: outbox_event
+        options: |
+          {
+            "validationLevel": "strict", "validationAction": "error",
+            "validator": { "$jsonSchema": {
+              "bsonType": "object", "additionalProperties": false,
+              "required": ["_id", "eventType", "routingKey", "envelope", "createdAt", "publishedAt", "attempts"],
+              "properties": {
+                "_id": {"bsonType": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+                "eventType": {"enum": ["NewChatMessage"]},
+                "routingKey": {"enum": ["chat.new-message"]},
+                "envelope": {"bsonType": "object"},
+                "createdAt": {"bsonType": "date"},
+                "publishedAt": {"bsonType": ["date", "null"]},
+                "attempts": {"bsonType": "int", "minimum": 0}
+              }
+            } }
+          }
+    rollback:
+    - dropCollection:
+        collectionName: outbox_event
