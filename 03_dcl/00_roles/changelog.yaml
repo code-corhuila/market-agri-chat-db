@@ -1,0 +1,27 @@
+# The role of the domain (Anexo B rule 5): no password; chat_app is created by market-agri-infra-mongo.
+# find, insert and update only: chat never deletes (the history is the record, FR-021) and the relay
+# marks an event as published with an update. A deletion is a migration run by the administrator.
+databaseChangeLog:
+- changeSet:
+    id: 001-role-chat-writer
+    author: elkin
+    changes:
+    - runCommand:
+        command: |
+          {
+            "createRole": "chat_writer",
+            "privileges": [{"resource": {"db": "chat", "collection": "conversation"}, "actions": ["find", "insert", "update"]}, {"resource": {"db": "chat", "collection": "message"}, "actions": ["find", "insert", "update"]}, {"resource": {"db": "chat", "collection": "outbox_event"}, "actions": ["find", "insert", "update"]}],
+            "roles": []
+          }
+    rollback:
+    - runCommand:
+        command: '{"dropRole": "chat_writer"}'
+- changeSet:
+    id: 002-grant-chat-writer-to-chat-app
+    author: elkin
+    changes:
+    - runCommand:
+        command: '{"grantRolesToUser": "chat_app", "roles": [{"role": "chat_writer", "db": "chat"}]}'
+    rollback:
+    - runCommand:
+        command: '{"revokeRolesFromUser": "chat_app", "roles": [{"role": "chat_writer", "db": "chat"}]}'

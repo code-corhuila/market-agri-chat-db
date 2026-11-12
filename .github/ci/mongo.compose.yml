@@ -1,0 +1,34 @@
+# Throwaway MongoDB for the db-ci job only: the same service market-agri-infra-mongo defines (one-node
+# replica set rs0 with authentication, keyFile generated in the container, chat_app without roles),
+# repeated here because that repository is private and the job cannot check it out.
+services:
+  mongo:
+    image: mongo:7.0.16
+    hostname: mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ADMIN_USER:?}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ADMIN_PASSWORD:?}
+      CHAT_APP_PASSWORD: ${CHAT_APP_PASSWORD:?}
+    entrypoint:
+      - bash
+      - -c
+      - |
+        head -c 756 /dev/urandom | base64 -w 0 > /tmp/key && chown 999:999 /tmp/key && chmod 400 /tmp/key
+        echo "db.getSiblingDB('chat').createUser({ user: 'chat_app', pwd: process.env.CHAT_APP_PASSWORD, roles: [] })" > /docker-entrypoint-initdb.d/01.js
+        exec docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /tmp/key
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          mongosh --quiet --host mongo -u "$$MONGO_INITDB_ROOT_USERNAME" -p "$$MONGO_INITDB_ROOT_PASSWORD"
+          --authenticationDatabase admin --eval
+          "try { rs.status() } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] }) }
+          quit(db.hello().isWritablePrimary ? 0 : 1)"
+      interval: 5s
+      timeout: 10s
+      retries: 20
+    networks: [platform]
+networks:
+  platform:
+    name: platform-dev
+    external: true
