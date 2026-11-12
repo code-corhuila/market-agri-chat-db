@@ -1,0 +1,26 @@
+name: db-ci
+
+on:
+  pull_request:
+    branches: [develop, qa, main]
+
+jobs:
+  db-ci:
+    runs-on: ubuntu-latest
+    env:
+      CI: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Throwaway MongoDB (replica set with authentication)
+        run: |
+          cat > ci.env <<ENV
+          COMPOSE_PROJECT_NAME=chat-db-ci
+          ENV=dev
+          MONGO_ADMIN_USER=mongo_admin
+          MONGO_ADMIN_PASSWORD=$(openssl rand -hex 16)
+          CHAT_APP_PASSWORD=$(openssl rand -hex 16)
+          ENV
+          docker network create platform-dev
+          docker compose -f .github/ci/mongo.compose.yml --env-file ci.env up -d --wait
+      - name: Build, update, second run, checks, rollback, rebuild
+        run: bash tests/db-ci.sh ci.env
