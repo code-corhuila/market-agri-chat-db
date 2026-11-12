@@ -1,0 +1,6 @@
+databaseChangeLog:
+  - include: { file: 02_dml/00_inserts/changelog.yaml }
+  - include: { file: 02_dml/01_updates/changelog.yaml }
+  - include: { file: 02_dml/02_deletes/changelog.yaml }
+  - include: { file: 02_dml/03_upserts/changelog.yaml }
+  - include: { file: 02_dml/04_patches/changelog.yaml }

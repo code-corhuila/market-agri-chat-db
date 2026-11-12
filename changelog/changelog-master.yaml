@@ -1,0 +1,6 @@
+# Single entry point of the database chat (Anexo B). Each family in order: collections with their
+# validators and indexes, data, then the role of chat_app. Run by the administrator from infra.
+databaseChangeLog:
+  - include: { file: 01_ddl/changelog.yaml }
+  - include: { file: 02_dml/changelog.yaml }
+  - include: { file: 03_dcl/changelog.yaml }
