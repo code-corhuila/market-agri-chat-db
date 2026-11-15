@@ -1,0 +1,5 @@
+databaseChangeLog:
+  - include: { file: 01_ddl/00_collections/changelog.yaml }
+  - include: { file: 01_ddl/01_validators/changelog.yaml }
+  - include: { file: 01_ddl/02_indexes/changelog.yaml }
+  - include: { file: 01_ddl/03_views/changelog.yaml }
