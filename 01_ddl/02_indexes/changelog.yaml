@@ -1,0 +1,81 @@
+# Named indexes (Anexo B rule 2), each answering a real query of chat-api. The unique ones are
+# structure, not optimisation: they decide the races (two opens of the same pair, a resent frame).
+databaseChangeLog:
+- changeSet:
+    id: 001-index-conversation-product-buyer
+    author: elkin
+    comment: AGGR-INV-001 — one conversation per (product, buyer); E-30 looks it up and loses races to it
+    changes:
+    - createIndex:
+        collectionName: conversation
+        keys: '{"productId": 1, "buyerId": 1}'
+        options: '{"name": "idx_conversation_productId_buyerId", "unique": true}'
+    rollback:
+    - dropIndex:
+        collectionName: conversation
+        keys: '{"productId": 1, "buyerId": 1}'
+- changeSet:
+    id: 002-index-conversation-buyer
+    author: elkin
+    comment: E-31 — the conversations of a buyer
+    changes:
+    - createIndex:
+        collectionName: conversation
+        keys: '{"buyerId": 1, "lastMessageAt": -1, "createdAt": -1}'
+        options: '{"name": "idx_conversation_buyerId"}'
+    rollback:
+    - dropIndex:
+        collectionName: conversation
+        keys: '{"buyerId": 1, "lastMessageAt": -1, "createdAt": -1}'
+- changeSet:
+    id: 003-index-conversation-producer
+    author: elkin
+    comment: E-31 — the conversations of a producer
+    changes:
+    - createIndex:
+        collectionName: conversation
+        keys: '{"producerId": 1, "lastMessageAt": -1, "createdAt": -1}'
+        options: '{"name": "idx_conversation_producerId"}'
+    rollback:
+    - dropIndex:
+        collectionName: conversation
+        keys: '{"producerId": 1, "lastMessageAt": -1, "createdAt": -1}'
+- changeSet:
+    id: 004-index-message-conversation-sent
+    author: elkin
+    comment: E-33 — history of a conversation by sentAt ascending, then id
+    changes:
+    - createIndex:
+        collectionName: message
+        keys: '{"conversationId": 1, "sentAt": 1, "_id": 1}'
+        options: '{"name": "idx_message_conversationId_sentAt"}'
+    rollback:
+    - dropIndex:
+        collectionName: message
+        keys: '{"conversationId": 1, "sentAt": 1, "_id": 1}'
+- changeSet:
+    id: 005-index-message-sender-request
+    author: elkin
+    comment: Contract §5.3 — a message.send resent with the same requestId stores nothing new
+    changes:
+    - createIndex:
+        collectionName: message
+        keys: '{"senderId": 1, "requestId": 1}'
+        options: '{"name": "idx_message_senderId_requestId", "unique": true}'
+    rollback:
+    - dropIndex:
+        collectionName: message
+        keys: '{"senderId": 1, "requestId": 1}'
+- changeSet:
+    id: 006-index-outbox-unpublished
+    author: elkin
+    comment: The relay reads the unpublished events, oldest first (ADR-014)
+    changes:
+    - createIndex:
+        collectionName: outbox_event
+        keys: '{"publishedAt": 1, "createdAt": 1}'
+        options: '{"name": "idx_outbox_event_publishedAt_createdAt"}'
+    rollback:
+    - dropIndex:
+        collectionName: outbox_event
+        keys: '{"publishedAt": 1, "createdAt": 1}'

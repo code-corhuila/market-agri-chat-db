@@ -1,0 +1,2 @@
+databaseChangeLog:
+  - include: { file: 03_dcl/00_roles/changelog.yaml }
